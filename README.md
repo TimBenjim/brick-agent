@@ -8,7 +8,7 @@ You may use the following technology stack to control your EV3 via agentic AI:
 4. add it to your claude_desktop_config.json
    
         "mcpServers": {
-             "ev3-roboter": {
+             "ev3-robot": {
                 "command": "<local-path>/ev3-env/bin/python",
                 "args": ["<local-path>/ev3_mcp.py"]
         }
