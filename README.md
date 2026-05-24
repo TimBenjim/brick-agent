@@ -1,6 +1,6 @@
 # BrickAgent - Connecting Claude to your Mindstorms EV3 Robot
 
-You may use a combination of the following tech to control your EV3 via agentic AI.
+You may use the following technology stack to control your EV3 via agentic AI:
 
 1. [https://www.ev3dev.org](https://www.ev3dev.org/docs/getting-started/) - start your EV3 from SD card flashed with ev3dev Linux
 2. Equip your EV3 with a wifi dongle to make it accessible in your WLAN
