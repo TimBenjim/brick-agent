@@ -3,7 +3,7 @@
 EV3 Mindstorms MCP Server for Mac
 Connection: SSH over local network (192.168.178.x) → EV3 Brick running ev3dev
 """
-  
+
 import paramiko
 from mcp.server.fastmcp import FastMCP
 
@@ -25,8 +25,8 @@ def ssh_run(python_code: str) -> str:
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     try:
         client.connect(EV3_HOST, username=EV3_USER, password=EV3_PASS, timeout=10)
-        cmd = f'python3 -c "{python_code.replace(chr(34), chr(39))}"'
-        _, stdout, stderr = client.exec_command(cmd)
+        cmd = 'python3 -c "{}"'.format(python_code.replace('"', "'"))
+        _, stdout, stderr = client.exec_command(cmd, timeout=15)
         out = stdout.read().decode().strip()
         err = stderr.read().decode().strip()
         return out if out else (err if err else "OK")
@@ -36,8 +36,8 @@ def ssh_run(python_code: str) -> str:
         client.close()
 
 
-def ssh_script(script: str) -> str:
-    """Uploads a multi-line Python script to the EV3 and executes it."""
+def ssh_script(script: str, timeout: int = 120) -> str:
+    """Uploads a multi-line Python script to the EV3 and executes it via pybricks-micropython."""
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     try:
@@ -46,7 +46,10 @@ def ssh_script(script: str) -> str:
         with sftp.open("/tmp/claude_cmd.py", "w") as f:
             f.write(script)
         sftp.close()
-        _, stdout, stderr = client.exec_command("brickrun -r -- pybricks-micropython /tmp/claude_cmd.py")
+        _, stdout, stderr = client.exec_command(
+            "brickrun -r -- pybricks-micropython /tmp/claude_cmd.py",
+            timeout=timeout
+        )
         out = stdout.read().decode().strip()
         err = stderr.read().decode().strip()
         return out if out else (err if err else "OK")
@@ -65,7 +68,7 @@ def drive_forward(distance_cm: float, speed: int = 300) -> str:
 
     Args:
         distance_cm: Distance to travel in centimeters
-        speed: Motor speed (100–800, default: 300)
+        speed: Motor speed in mm/s (100-800, default: 300)
     """
     distance_mm = int(distance_cm * 10)
     script = (
@@ -78,6 +81,7 @@ def drive_forward(distance_cm: float, speed: int = 300) -> str:
         "motor_left = Motor(Port.B)\n"
         "motor_right = Motor(Port.C)\n"
         "robot = DriveBase(motor_left, motor_right, wheel_diameter={}, axle_track={})\n".format(WHEEL_DIAMETER_MM, AXLE_TRACK_MM) +
+        "robot.settings(straight_speed={})\n".format(speed) +
         "robot.straight({})\n".format(distance_mm) +
         'print("Drove forward: {} cm")\n'.format(distance_cm)
     )
@@ -91,7 +95,7 @@ def drive_backward(distance_cm: float, speed: int = 300) -> str:
 
     Args:
         distance_cm: Distance to travel in centimeters
-        speed: Motor speed (100–800, default: 300)
+        speed: Motor speed in mm/s (100-800, default: 300)
     """
     distance_mm = int(-distance_cm * 10)
     script = (
@@ -104,6 +108,7 @@ def drive_backward(distance_cm: float, speed: int = 300) -> str:
         "motor_left = Motor(Port.B)\n"
         "motor_right = Motor(Port.C)\n"
         "robot = DriveBase(motor_left, motor_right, wheel_diameter={}, axle_track={})\n".format(WHEEL_DIAMETER_MM, AXLE_TRACK_MM) +
+        "robot.settings(straight_speed={})\n".format(speed) +
         "robot.straight({})\n".format(distance_mm) +
         'print("Drove backward: {} cm")\n'.format(distance_cm)
     )
@@ -117,7 +122,7 @@ def turn(angle_degrees: float) -> str:
 
     Args:
         angle_degrees: Turn angle in degrees. Positive = right, negative = left.
-                       Example: 90 = 90° right, -90 = 90° left, 180 = U-turn
+                       Example: 90 = 90 right, -90 = 90 left, 180 = U-turn
     """
     direction = "right" if angle_degrees > 0 else "left"
     script = (
@@ -136,19 +141,14 @@ def turn(angle_degrees: float) -> str:
 
 @mcp.tool()
 def stop() -> str:
-    """Stops all EV3 motors immediately."""
-    script = (
-        "from pybricks.ev3devices import Motor\n"
-        "from pybricks.parameters import Port\n"
-        "\n"
-        "for port in [Port.A, Port.B, Port.C, Port.D]:\n"
-        "    try:\n"
-        "        Motor(port).stop()\n"
-        "    except:\n"
-        "        pass\n"
-        'print("All motors stopped")\n'
+    """Stops all EV3 motors and kills any running pybricks script immediately."""
+    code = (
+        "import os; "
+        "os.system('pkill -f pybricks-micropython'); "
+        "os.system('pkill -f brickrun'); "
+        'print("All motors stopped")'
     )
-    return ssh_script(script)
+    return ssh_run(code)
 
 
 @mcp.tool()
@@ -157,7 +157,7 @@ def beep(frequency: int = 440, duration_ms: int = 500) -> str:
     Plays a tone on the EV3.
 
     Args:
-        frequency: Frequency in Hz (200–2000, default: 440 = concert A)
+        frequency: Frequency in Hz (200-2000, default: 440 = concert A)
         duration_ms: Duration in milliseconds (default: 500)
     """
     script = (
@@ -194,7 +194,7 @@ def measure_ir_distance() -> str:
     Sensor must be connected to port S4.
 
     Returns:
-        Proximity value 0–100 (not a real cm value):
+        Proximity value 0-100 (not a real cm value):
         0 = very close, 100 = no obstacle in range (~70 cm)
     """
     script = (
@@ -237,7 +237,7 @@ def control_single_motor(port: str, angle: int, speed: int = 200) -> str:
     Args:
         port: Motor port (A, B, C, or D)
         angle: Rotation angle in degrees (positive = forward, negative = backward)
-        speed: Speed in °/sec (default: 200)
+        speed: Speed in deg/sec (default: 200)
     """
     port_map = {"A": "Port.A", "B": "Port.B", "C": "Port.C", "D": "Port.D"}
     ev3_port = port_map.get(port.upper(), "Port.A")
@@ -261,32 +261,50 @@ def test_connection() -> str:
     code = (
         "import os; "
         "u = os.uname(); "
+        "v = int(open('/sys/class/power_supply/lego-ev3-battery/voltage_now').read()) / 1000000; "
+        "c = int(open('/sys/class/power_supply/lego-ev3-battery/current_now').read()) / 1000000; "
+        "status = 'OK' if v > 6.5 else 'LOW!'; "
         'print("EV3 connected!"); '
         'print("Hostname: " + u.nodename); '
-        'print("System: " + u.sysname + " " + u.release)'
+        'print("System: " + u.sysname + " " + u.release); '
+        'print("Battery: {:.2f} V ({}), {:.3f} A".format(v, status, c))'
     )
     return ssh_run(code)
 
+
 @mcp.tool()
 def run_custom_script(script: str) -> str:
-    return ssh_script(script)
+    """
+    Uploads and executes arbitrary pybricks-micropython code on the EV3.
     
-run_custom_script.__doc__ = f"""
-Uploads and executes arbitrary pybricks-micropython code on the EV3.
-Scripts must use the pybricks library (not standard ev3dev Python).
-Use this for complex programs, sequences, or sensor loops that
-can't be expressed with the individual tools.
+    IMPORTANT: Always show the script to the user and wait for explicit 
+    confirmation before executing. Never run without approval.
 
-Hardware configuration:
-- Port B: left drive motor
-- Port C: right drive motor
-- Port S3: color sensor
-- Port S4: infrared sensor
-- Wheel diameter: {WHEEL_DIAMETER_MM} mm, axle track: {AXLE_TRACK_MM} mm (for DriveBase)
+    Runtime environment:
+    - Uses pybricks-micropython (NOT standard Python, NOT ev3dev2)
+    - MicroPython only: no f-strings, no walrus operator, no os.uname(), no standard lib modules
+    - Use string concatenation or .format() instead of f-strings
 
-Args:
-    script: Complete pybricks-micropython script as a string
-"""
+    Hardware configuration:
+    - Port B: left drive motor
+    - Port C: right drive motor
+    - Port S3: color sensor
+    - Port S4: infrared sensor
+    - Wheel diameter: 33.3 mm, axle track: 186 mm
+
+    Common pybricks patterns:
+    - DriveBase: from pybricks.robotics import DriveBase
+    - Continuous driving: robot.drive(speed_mm_s, 0), then robot.stop() to halt
+    - Turn: robot.turn(degrees)  # positive = right, negative = left
+    - IR sensor: InfraredSensor(Port.S4).distance()  # returns 0-100
+    - Color sensor: ColorSensor(Port.S3).color()
+    - Sound: EV3Brick().speaker.say("text")
+    - Wait: from pybricks.tools import wait; wait(milliseconds)
+
+    Args:
+        script: Complete pybricks-micropython script as a string
+    """
+    return ssh_script(script)
 
 
 # ─── Start server ─────────────────────────────────────────────────
