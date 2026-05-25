@@ -267,6 +267,27 @@ def test_connection() -> str:
     )
     return ssh_run(code)
 
+@mcp.tool()
+def run_custom_script(script: str) -> str:
+    return ssh_script(script)
+    
+run_custom_script.__doc__ = f"""
+Uploads and executes arbitrary pybricks-micropython code on the EV3.
+Scripts must use the pybricks library (not standard ev3dev Python).
+Use this for complex programs, sequences, or sensor loops that
+can't be expressed with the individual tools.
+
+Hardware configuration:
+- Port B: left drive motor
+- Port C: right drive motor
+- Port S3: color sensor
+- Port S4: infrared sensor
+- Wheel diameter: {WHEEL_DIAMETER_MM} mm, axle track: {AXLE_TRACK_MM} mm (for DriveBase)
+
+Args:
+    script: Complete pybricks-micropython script as a string
+"""
+
 
 # ─── Start server ─────────────────────────────────────────────────
 if __name__ == "__main__":
