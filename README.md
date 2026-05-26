@@ -1,6 +1,6 @@
 # BrickAgent - Connecting Claude to your Mindstorms EV3 Robot
 
-Use the following approach to talk to your EV3 Robot via Claude:
+Use the following approach to team-up EV3 and Claude.
 
 1. [https://www.ev3dev.org](https://www.ev3dev.org/docs/getting-started/) - start your EV3 from SD card flashed with ev3dev Linux
 2. Equip your EV3 with a wifi dongle to make it accessible in your WLAN
