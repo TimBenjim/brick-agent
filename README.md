@@ -32,4 +32,7 @@ Sensors give you a feedback-loop.
 
 Disclaimer: run custom script is potentially dangerous. Claude may decide to let your robot drive over your feet.
 
+### Notes
+- [ev3dev-browser](https://marketplace.visualstudio.com/items?itemName=ev3dev.ev3dev-browser) may help debugging, you can connect via USB and ssh into the ev3 in VS Code if the WIFI setup fails for some reason
+- for me, bluetooth failed as cable-less connection option as it seems in macOS Bluetooth PAN has been removed
 
